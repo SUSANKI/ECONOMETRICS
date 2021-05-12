@@ -1,0 +1,340 @@
+---
+title: "FINANCIAL ECONOMETRICS- R_LAB"
+author: "NGUYEN NGOC PHUNG"
+date: "5/6/2021"
+output:
+  pdf_document:
+    toc: yes
+    toc_depth: '2'
+  html_document:
+    code_download: no
+    highlight: pygments
+    number_sections: yes
+    theme: flatly
+    toc: yes
+    toc_depth: 2
+    toc_float: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE,fig.align = 'center',out.width = '90%')
+
+library(knitr)
+```
+
+<style>
+#TOC {
+  color: #708090;
+  font-family: Calibri;
+  font-size: 19px; 
+  border-color: #708090;
+}
+h1.title {
+  color: #F08080;
+  background-color: #F5F5F5;
+  opacity: 0.9;
+  font-family: Calibri;
+  font-size: 50px;
+}
+h4.author{
+  color: green;
+  font-family: Calibri;
+  background-color: #F5F5F5
+  font-size: 26px; 
+}
+h4.date{
+  color: #708090;
+  font-family: Calibri;
+  background-color: #F5F5F5
+}
+body {
+  color: black;
+  font-family: Calibri;
+  background-color: white;
+  font-size: 13px; 
+}
+pre {
+  color: blue;
+  background-color: white;
+  font-size: 14px; 
+}
+</style>
+
+
+# REGRESSION MODEL AND TESTINGS
+
+### IMPORT THE LIBRARIES
+```{r}
+library(psych)
+library(readxl)
+library(car)
+library(tseries)
+library(lmtest)
+library(MASS)
+library(foreign)
+library(sandwich)
+```
+## UKHP DATASET
+
+### UKHP DATASET AND RETURNS
+```{r}
+HP <- read_excel("UKHP.xls")
+
+
+Z<-ts(HP$`Average House Price`)
+DHP<-100*diff(Z)/lag(Z,-1)
+DHP[1:20]
+```
+### HISTOGRAM OF RETURNS TIME SERIES (DHP)
+```{r}
+hist(DHP, breaks = 70, col='deeppink3', main='HISTOGRAM OF SIMPLE RETURN (DHP)')
+
+```
+
+### DESCRITIVE STATISTICS OF RETURNS (DHP)
+```{r}
+summary(DHP)
+describe(DHP)
+```
+
+### PLOTTING OF HOUSE PRICE AND RETURNS TIME SERIES 
+```{r}
+layout(matrix(c(1,2,1,2),2,2))
+plot(Z,type='l',col='darkred')
+plot(DHP,type='l',col='darkblue')
+```
+
+## SANDPHEDGE DATASET
+
+### SANDPHEDGE DATASET AND RETURNS
+```{r}
+# The dataset include the spot and future price @-@
+SandPhedge <- read_excel('SandPhedge.xls')
+
+
+spot<-SandPhedge$Spot ; future<- SandPhedge$Futures
+
+spot<-ts(spot) ; future<-ts(future)
+
+# Plotting of spot and future price 8-*
+layout(matrix(c(1,2,1,2),2,2))
+plot(spot,type='l',col='darkred')
+plot(future,type='l',col='darkblue')
+```
+
+```{r}
+# Now, we calculate the log-returns of both spot and future prices @-@
+rspot <- 100*diff(log(spot))
+rfuture <- 100*diff(log(future))
+
+# Histogram of both returns time series 
+layout(matrix(c(1,1,2,2),2,2))
+hist(rspot,breaks=30, col='deeppink3',main='RETURNS OF SPOT PRICE')
+hist(rfuture,breaks=30, col='darkgreen',main='RETURNS OF FUTURE PRICE')
+```
+
+### SIMPLE REGRESSION MODEL
+```{r}
+# We concern about whether the return of future price explain the changes of return in spot price or not @-@
+
+ReturnReg<-lm(rspot~rfuture)
+summary(ReturnReg)
+
+# Plotting of regression model @-@
+plot(rspot, rfuture,col='green')
+abline(ReturnReg,col='darkred',lwd=1.5)
+```
+
+### GOODNESS-OF-FIT STATISTIC - DEVIANCE AND LOG-LIKELIHOOD
+```{r}
+# in order to assess how good our model fit the actual values, we calculate the deviance (SSR)
+deviance(ReturnReg)
+logLik(ReturnReg)  # return the logLik objects s.a the degree of freedom
+```
+
+### BREUSCH-PAGAN TEST
+```{r}
+bptest(ReturnReg)
+```
+
+### BREUSCH-GODFREY TEST
+```{r}
+bgtest(ReturnReg)
+```
+
+### DURBIN-WATSON TEST FOR AUTO-CORRELATED ERRORS
+```{r}
+dwtest(ReturnReg)
+durbinWatsonTest(ReturnReg,max.lag=2)
+```
+
+### NON-CONSTANT VARIANCE SCORE TEST
+```{r}
+ncvTest(ReturnReg)
+```
+
+### AUGMENTED DICKEY-FULLER TEST FOR RETURNS (SPOT & FUTURE) AND PRICE (SPOT & FUTURE)
+```{r}
+# returns
+adf.test(na.omit(rspot))
+adf.test(na.omit(rfuture))
+
+# prices
+adf.test(spot)
+adf.test(future)
+```
+
+## MACRO DATASET
+
+### MACRO DATASET AND RETURNS
+```{r}
+macro <- read_excel('macro.xls')
+
+
+spread<-ts(macro$BMINUSA)
+credit<-ts(macro$CCREDIT)
+prod<-ts(macro$INDPRO)
+msoft<-ts(macro$MICROSOFT)
+sandp<-ts(macro$SANDP)
+money<-ts(macro$M1SUPPLY)
+cpi<-ts(macro$CPI)
+
+dspread<-diff(spread)
+dcredit<-diff(credit)
+dprod<-diff(prod)
+dmoney<-diff(money)
+
+rmsoft<-100*diff(log(msoft))
+rsandp<-100*diff(log(sandp))
+
+term<-ts(macro$USTB10Y)-ts(macro$USTB3M)
+inflation<-100*diff(log(cpi))
+dinflation<-diff(inflation)
+mustb3m<-ts(macro$USTB3M)/12
+rterm<-diff(term)
+ermsoft<-rmsoft - mustb3m
+ersandp<-rsandp - mustb3m
+```
+
+### MULTIPLE REGRESSION MODEL
+```{r}
+msoftreg <- lm(ermsoft[2:325]~ersandp[2:325] + dprod[2:325] + dcredit[2:325] +
+                 dinflation[2:325] + dmoney[2:325] + dspread[2:325] + rterm[2:325])
+summary(msoftreg)
+```
+
+### NEWEY-WEST TEST FOR HETEROSCEDASTICITY AND AUTOCORRELATION
+```{r}
+# Simply stated, this function return teh HAC Covariance matric Estimation
+NeweyWest(msoftreg)
+```
+
+```{r}
+bwNeweyWest(msoftreg)
+```
+
+```{r}
+NeweyWest(msoftreg, lag = 4, prewhite = FALSE)
+```
+
+
+# ARIMA MODELS
+
+## IMPORT LIBRARIES
+```{r}
+library(psych)
+library(lmtest)
+library(forecast)
+library(readxl)
+library(tseries)
+```
+
+## IMPORT AND VIEW THE DATASET
+```{r}
+HP <- read_excel("UKHP.xls")
+
+```
+
+## EXTRACT THE HOUSE PRICE TIME SERIES AND ESTIMATE THE SIMPLE RETURNS 
+```{r}
+Z<-HP$`Average House Price`
+Z<-ts(HP$`Average House Price`)
+DHP<-100*diff(Z)/lag(Z,-1)
+```
+
+## PLOTTING OF HP AND DHP
+```{r}
+layout(matrix(c(1,2,1,2),2,2))
+plot(HP,type='l',col='darkred')
+plot(DHP,type='l',col='darkblue')
+```
+
+## DESCRIPTIVE STATISTICS OF RETURNS
+```{r}
+summary(DHP)
+```
+
+## ACF AND PACF PLOTS OF HOUSE PRICE (HP)
+```{r}
+acf(HP,lag=24)
+pacf(HP,lag=24)
+```
+
+## ACF AND PACF PLOTS OF SIMPLE RETURNS (DHP)
+```{r}
+layout(matrix(c(1,1,2,2),2,2))
+acf(DHP,lag=20)
+pacf(DHP,lag=20)
+```
+
+## AUGMENTED DICKEY-FULLER TEST
+```{r}
+# In order to test whether the DHP time series is stationary or not(unit root), we perform the ADF test @-@
+adf.test(DHP)
+```
+
+## FIND THE COEFFICIENT MATRIX OF ARIMA MODEL BY coeftest() FUNCTION
+```{r}
+# Setting the order: ARIMA(0,1,2), we can estimate the coefficient matrix (including estimates, SEs, test statistics and p-values) as the following:
+arima11<-arima(DHP,order=c(0,1,2))
+coeftest(arima11)
+```
+
+## FIND AIC (INFORMATION CRITERIA) OF ARIMA(1,0,2) AND ARIMA(1,0,1)
+```{r}
+# ARIMA(1,0,2)
+arima11<-arima(DHP,order=c(1,0,2))
+AIC(arima11)
+
+# ARIMA(1,0,1)
+arima11<-arima(DHP,order=c(1,0,1))
+AIC(arima11)
+```
+
+## FORECASTING IN TIME SERIES
+```{r}
+# forecasting for ARIMA(1,0,1) over 2 periods (h=2)
+fcast <- forecast(arima11, h=2)
+summary(fcast)
+
+# Plotting
+plot(fcast)
+```
+
+## FINDING THE BEST ARIMA MODEL ACCORDING TO AIC, BIC VALUE
+```{r}
+# Instead of finding the best ARIMA model for time series, we can use the auto.arima() function to find optimal order @-@
+
+auto.arima(DHP, max.order = 5) #example with max order =5
+
+# we find optimal ARIMA model for returns (DHP) using max arima order =10
+fit<-auto.arima(DHP, max.order = 10) 
+
+# forecasting of 'fit' over 20 periods (extra)
+plot(forecast(fit,h=20),col='darkmagenta')
+```
+
+## LJUNG-BOX TEST TO CHECK IF THE RESIDUALS SERIES IS WHITE NOISE PROCESS
+```{r}
+checkresiduals(fit)
+```
